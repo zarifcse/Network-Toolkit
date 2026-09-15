@@ -1,0 +1,8 @@
+﻿venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+speedtest.exe
+speedtest-cli.zip

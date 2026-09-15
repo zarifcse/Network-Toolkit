@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Network Toolkit</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <h2>NetToolkit</h2>
+      </div>
+      <nav class="nav-links">
+        <button class="nav-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+        <button class="nav-btn" onclick="switchTab('dns')">DNS Switcher</button>
+        <button class="nav-btn" onclick="switchTab('diagnostics')">Diagnostics</button>
+      </nav>
+      <div class="version-tag" id="versionBadge">v1.0.0</div>
+    </aside>
+
+    <main class="content-area">
+      <!-- DASHBOARD TAB -->
+      <section id="tab-dashboard" class="tab-content active">
+        <header class="section-header">
+          <h1>System Overview</h1>
+          <p>Real-time network states and single-click optimizers.</p>
+        </header>
+
+        <div class="cards-grid">
+          <div class="card">
+            <h3>Quick Actions</h3>
+            <div class="button-stack">
+              <button class="action-btn" onclick="runRefresh()">Refresh Network</button>
+              <button class="action-btn danger" onclick="runDeepRepair()">Deep Stack Repair</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Check Updates</h3>
+            <p id="updateStatusText">Checking GitHub releases...</p>
+            <button class="action-btn secondary" id="btnUpdate" onclick="triggerUpdate()" style="display:none;">Update Now</button>
+          </div>
+        </div>
+
+        <div class="card log-card" style="margin-top: 1.5rem;">
+          <h3>Execution Console</h3>
+          <div id="statusConsole" class="terminal-box">Ready. Select an action above.</div>
+        </div>
+      </section>
+
+      <!-- DNS CONFIGURATOR TAB -->
+      <section id="tab-dns" class="tab-content">
+        <header class="section-header">
+          <h1>DNS Profiles</h1>
+          <p>Switch active adapter resolvers and flush DNS cache.</p>
+        </header>
+        <div class="cards-grid">
+          <div class="card">
+            <h3>Cache Speed DNS</h3>
+            <p>Primary: 10.11.12.13<br>Secondary: 8.8.8.8</p>
+            <button class="action-btn" onclick="setDnsProfile('cache')">Apply Cache Profile</button>
+          </div>
+          <div class="card">
+            <h3>Raw Gaming DNS</h3>
+            <p>Primary: 1.1.1.1<br>Secondary: 8.8.8.8</p>
+            <button class="action-btn" onclick="setDnsProfile('raw')">Apply Raw Profile</button>
+          </div>
+          <div class="card">
+            <h3>DHCP Automatic</h3>
+            <p>Revert adapter to router-assigned default DNS.</p>
+            <button class="action-btn secondary" onclick="setDnsProfile('dhcp')">Reset to Auto</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- DIAGNOSTICS TAB -->
+      <section id="tab-diagnostics" class="tab-content">
+        <header class="section-header">
+          <h1>Network Diagnostics</h1>
+          <p>Ping monitoring and bandwidth verification.</p>
+        </header>
+        <div class="card">
+          <div class="card-action-header">
+            <h3>Pre-Game Route Latency</h3>
+            <button class="action-btn sm" onclick="runPingCheck()">Run Latency Check</button>
+          </div>
+          <table class="diag-table">
+            <thead>
+              <tr><th>Target</th><th>IP Address</th><th>Latency</th><th>Packet Loss</th></tr>
+            </thead>
+            <tbody id="pingTableBody">
+              <tr><td colspan="4">Click "Run Latency Check" to gather telemetry.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="cards-grid" style="margin-top: 1.5rem;">
+          <div class="card">
+            <h3>Dhaka BDIX Speed</h3>
+            <p>Tests against local peering nodes.</p>
+            <button class="action-btn" onclick="runSpeedtest('bdix')">Test BDIX</button>
+            <div id="bdixOutput" class="stat-readout">-- Mbps</div>
+          </div>
+          <div class="card">
+            <h3>Singapore Gateway Speed</h3>
+            <p>Singtel Transit Route (ID: 13623).</p>
+            <button class="action-btn" onclick="runSpeedtest('singapore')">Test Singapore</button>
+            <div id="sgOutput" class="stat-readout">-- Mbps</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
