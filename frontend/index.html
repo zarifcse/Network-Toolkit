@@ -18,8 +18,14 @@
         <button class="nav-btn active" onclick="switchTab('dashboard')">Dashboard</button>
         <button class="nav-btn" onclick="switchTab('dns')">DNS Switcher</button>
         <button class="nav-btn" onclick="switchTab('diagnostics')">Diagnostics</button>
+        <!-- NEW HISTORY TAB -->
+        <button class="nav-btn" onclick="switchTab('history')">History</button> 
       </nav>
-      <div class="version-tag" id="versionBadge">v1.0.0</div>
+      <div class="version-tag" id="versionBadge">
+        <strong>v1.0.0</strong><br>
+        Developer: Zahin<br>
+        &copy; 2026 All Rights Reserved
+      </div>
     </aside>
 
     <main class="content-area">
@@ -33,20 +39,32 @@
         <div class="cards-grid">
           <div class="card">
             <h3>Quick Actions</h3>
+            <!-- REORDERED BUTTONS -->
             <div class="button-stack">
+              <button class="action-btn secondary" onclick="checkCurrentDns()">Check Current DNS</button>
               <button class="action-btn" onclick="runRefresh()">Refresh Network</button>
               <button class="action-btn danger" onclick="runDeepRepair()">Deep Stack Repair</button>
             </div>
           </div>
 
           <div class="card">
-            <h3>Check Updates</h3>
-            <p id="updateStatusText">Checking GitHub releases...</p>
-            <button class="action-btn secondary" id="btnUpdate" onclick="triggerUpdate()" style="display:none;">Update Now</button>
+            <div class="card-action-header">
+              <h3>Check Updates</h3>
+              <!-- NEW PROFESSIONAL SYNC ICON -->
+              <button class="icon-btn" id="updateSyncBtn" onclick="triggerUpdateCheck()" title="Refresh Updates">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+              </button>
+            </div>
+            <p id="updateStatusText" class="mt-1">Current Version: v1.0.0</p>
+            <button class="action-btn secondary mt-2" id="btnUpdate" onclick="triggerUpdate()" style="display:none;">Update Now</button>
           </div>
         </div>
 
-        <div class="card log-card" style="margin-top: 1.5rem;">
+        <div class="card log-card mt-2">
           <h3>Execution Console</h3>
           <div id="statusConsole" class="terminal-box">Ready. Select an action above.</div>
         </div>
@@ -58,7 +76,7 @@
           <h1>DNS Profiles</h1>
           <p>Switch active adapter resolvers and flush DNS cache.</p>
         </header>
-        <div class="cards-grid">
+        <div class="cards-grid mb-2">
           <div class="card">
             <h3>Cache Speed DNS</h3>
             <p>Primary: 10.11.12.13<br>Secondary: 8.8.8.8</p>
@@ -75,6 +93,11 @@
             <button class="action-btn secondary" onclick="setDnsProfile('dhcp')">Reset to Auto</button>
           </div>
         </div>
+        
+        <div class="dns-visualizer" id="dnsVisualizer">
+          <div class="pulse-dot" id="dnsPulse"></div>
+          <span id="dnsVisualText">DNS Engine Ready</span>
+        </div>
       </section>
 
       <!-- DIAGNOSTICS TAB -->
@@ -83,7 +106,8 @@
           <h1>Network Diagnostics</h1>
           <p>Ping monitoring and bandwidth verification.</p>
         </header>
-        <div class="card">
+
+        <div class="card mb-2">
           <div class="card-action-header">
             <h3>Pre-Game Route Latency</h3>
             <button class="action-btn sm" onclick="runPingCheck()">Run Latency Check</button>
@@ -98,21 +122,59 @@
           </table>
         </div>
 
-        <div class="cards-grid" style="margin-top: 1.5rem;">
+        <div class="cards-grid">
           <div class="card">
-            <h3>Dhaka BDIX Speed</h3>
-            <p>Tests against local peering nodes.</p>
-            <button class="action-btn" onclick="runSpeedtest('bdix')">Test BDIX</button>
+            <h3>BDIX SPEED</h3>
+            <!-- Added ID here to dynamically update the server name -->
+            <p class="target-sub" id="bdixTargetText">Target: Auto-selecting local node...</p>
+            <button class="action-btn mt-1" onclick="runSpeedtest('bdix')">Test BDIX</button>
             <div id="bdixOutput" class="stat-readout">-- Mbps</div>
           </div>
           <div class="card">
-            <h3>Singapore Gateway Speed</h3>
-            <p>Singtel Transit Route (ID: 13623).</p>
-            <button class="action-btn" onclick="runSpeedtest('singapore')">Test Singapore</button>
+            <h3>RAW SPEED</h3>
+            <p class="target-sub">Target: Singtel Singapore (ID: 13623)</p>
+            <button class="action-btn mt-1" onclick="runSpeedtest('singapore')">Test Singapore</button>
             <div id="sgOutput" class="stat-readout">-- Mbps</div>
           </div>
         </div>
       </section>
+
+      <!-- SEPARATED HISTORY TAB -->
+      <section id="tab-history" class="tab-content">
+        <!-- Flexbox header to place the Clear button nicely on the right -->
+        <header class="section-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <h1>Activity History</h1>
+            <p>Review past diagnostics and routing performance.</p>
+          </div>
+          <button class="action-btn danger sm" onclick="clearHistory()">Clear History</button>
+        </header>
+
+        <div class="card mb-2">
+          <h3>Speed Test History</h3>
+          <table class="diag-table">
+            <thead>
+              <tr><th>Date & Time</th><th>Type</th><th>Download</th><th>Upload</th><th>Ping</th></tr>
+            </thead>
+            <tbody id="speedHistoryTableBody">
+              <!-- Speed History loads here -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h3>Ping Test History</h3>
+          <table class="diag-table">
+            <thead>
+              <tr><th>Date & Time</th><th>Target</th><th>Latency</th><th>Packet Loss</th></tr>
+            </thead>
+            <tbody id="pingHistoryTableBody">
+              <!-- Ping History loads here -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+      
     </main>
   </div>
   <script src="script.js"></script>

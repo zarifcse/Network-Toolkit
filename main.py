@@ -1,10 +1,39 @@
 import os
+import sys
+import ctypes
 import webview
 from backend.network_manager import NetworkManager
 from backend.updater import UpdateManager
 
+# ==========================================
+# SILENT AUTO-ADMIN ELEVATION
+# ==========================================
+def is_admin():
+    """Check if the script is running with Windows Administrator privileges."""
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except:
+        return False
+
+if not is_admin():
+    # Force the app to relaunch using 'pythonw.exe' (Windowed Python)
+    # This triggers the Admin UAC prompt but completely hides the background terminal.
+    executable = sys.executable
+    if executable.lower().endswith("python.exe"):
+        executable = executable.replace("python.exe", "pythonw.exe")
+    
+    ctypes.windll.shell32.ShellExecuteW(
+        None, 
+        "runas", 
+        executable, 
+        f'"{os.path.abspath(__file__)}"', 
+        None, 
+        1 
+    )
+    sys.exit()
+# ==========================================
+
 class BridgeAPI:
-    """This class exposes Python methods to the JavaScript frontend."""
     def set_dns(self, primary: str, secondary: str | None = None):
         return NetworkManager.set_dns(primary, secondary)
 
@@ -13,6 +42,9 @@ class BridgeAPI:
 
     def deep_repair(self):
         return NetworkManager.deep_repair()
+
+    def get_current_dns(self):
+        return NetworkManager.get_current_dns()
 
     def run_ping_diagnostics(self):
         return NetworkManager.run_ping_diagnostics()
@@ -28,12 +60,9 @@ class BridgeAPI:
 
 def main():
     api = BridgeAPI()
-    
-    # Get the absolute path to your HTML file
     current_dir = os.path.dirname(os.path.abspath(__file__))
     frontend_path = os.path.join(current_dir, "frontend", "index.html")
     
-    # Create the native Windows GUI using Edge WebView2
     webview.create_window(
         title="Network Toolkit",
         url=frontend_path,
@@ -43,7 +72,6 @@ def main():
         resizable=True,
         min_size=(900, 600)
     )
-    
     webview.start()
 
 if __name__ == "__main__":

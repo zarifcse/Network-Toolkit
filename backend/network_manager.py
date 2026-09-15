@@ -59,6 +59,19 @@ class NetworkManager:
         }
 
     @classmethod
+    def get_current_dns(cls) -> dict:
+        """Fetch the currently active DNS IPs for physical adapters."""
+        ps_cmd = (
+            "(Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | "
+            "Get-DnsClientServerAddress -AddressFamily IPv4).ServerAddresses -join ', '"
+        )
+        success, out = cls.run_command(f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{ps_cmd}"')
+        
+        if success and out.strip():
+            return {"status": "success", "message": f"Active DNS: {out.strip()}"}
+        return {"status": "success", "message": "Active DNS: Automatic (DHCP)"}
+
+    @classmethod
     def quick_refresh(cls) -> dict:
         """Release IP, flush resolver cache, and renew IP."""
         cls.run_command("ipconfig /release")
@@ -88,6 +101,7 @@ class NetworkManager:
         targets = [
             {"name": "Quad9 Primary", "ip": "9.9.9.9"},
             {"name": "Cloudflare DNS", "ip": "1.1.1.1"},
+            {"name": "Google DNS", "ip": "8.8.8.8"},          
             {"name": "ISP Cache DNS", "ip": "10.11.12.13"},
             {"name": "Singapore Game Cluster", "ip": "13.228.0.251"},
         ]

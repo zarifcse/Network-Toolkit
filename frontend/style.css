@@ -107,3 +107,72 @@ body {
 .diag-table td { padding: 0.75rem; border-bottom: 1px solid var(--border-color); }
 .card-action-header { display: flex; justify-content: space-between; align-items: center; }
 .stat-readout { font-size: 1.5rem; font-weight: 700; color: var(--accent); margin-top: 1rem; }
+
+/* Custom Utility Classes */
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1.5rem; }
+.mb-2 { margin-bottom: 1.5rem; }
+
+/* Circular Refresh Button */
+.icon-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.icon-btn:hover { background: var(--accent); color: #0f172a; }
+.icon-btn svg { width: 14px; height: 14px; }
+
+/* DNS Visualizer Bar */
+.dns-visualizer {
+  background: #090d16;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+}
+.dns-visualizer.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.15);
+}
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: background 0.3s ease;
+}
+.dns-visualizer.active .pulse-dot {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+/* Diagnostic Subtitles */
+.target-sub {
+  font-size: 0.75rem !important;
+  color: #64748b !important;
+  margin-top: -0.25rem;
+  margin-bottom: 1rem !important;
+  font-style: italic;
+}
+
+/* Update Sync Spin Animation */
+@keyframes spin { 100% { transform: rotate(360deg); } }
+.icon-btn.spinning svg {
+  animation: spin 1s linear infinite;
+  color: var(--accent);
+}
