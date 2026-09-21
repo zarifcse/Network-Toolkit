@@ -4,5 +4,7 @@ __pycache__/
 build/
 dist/
 *.spec
+*.exe
+Version/
 speedtest.exe
 speedtest-cli.zip

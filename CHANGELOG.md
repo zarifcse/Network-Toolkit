@@ -1,4 +1,18 @@
-﻿# Changelog
+﻿## [1.1.0] - 2026-09-21
+
+### Added
+- **Live ISP Dashboard:** Real-time extraction of Active Network Adapters, Local IPv4, Default Gateways, and Retail Provider names.
+- **Privacy Controls:** Added a UI toggle to hide/show the Public IP address for safe screen sharing.
+- **Multi-line Console:** Upgraded the execution console to a scrollable, multi-line format with timestamp tracking and clipboard copy support.
+
+### Changed
+- **Parallel Speed Tests:** Engineered a dynamic cache isolation system allowing BDIX and RAW speed tests to execute in perfect, simultaneous parallel without crashing.
+- **Smart Retry Engine:** The RAW speed test now dynamically cycles through top Singapore servers (Singtel, Campana, Pacific Internet, CBN) to bypass offline nodes automatically.
+
+### Fixed
+- Fixed a deep Windows PowerShell bug that caused Local IPv4 addresses to truncate to a single character.
+- Fixed a routing bug where data center upstream names were displayed instead of the actual retail ISP name.
+
 
 ## [1.0.0] - Initial Release
 

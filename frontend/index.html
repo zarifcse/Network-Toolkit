@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Network Toolkit</title>
+  <title>Network Toolkit v1.1.0</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -10,21 +10,15 @@
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <div class="logo">
-        <span class="logo-icon">⚡</span>
-        <h2>NetToolkit</h2>
-      </div>
+      <div class="logo"><span class="logo-icon">⚡</span><h2>NetToolkit</h2></div>
       <nav class="nav-links">
         <button class="nav-btn active" onclick="switchTab('dashboard')">Dashboard</button>
         <button class="nav-btn" onclick="switchTab('dns')">DNS Switcher</button>
         <button class="nav-btn" onclick="switchTab('diagnostics')">Diagnostics</button>
-        <!-- NEW HISTORY TAB -->
         <button class="nav-btn" onclick="switchTab('history')">History</button> 
       </nav>
       <div class="version-tag" id="versionBadge">
-        <strong>v1.0.0</strong><br>
-        Developer: Zahin<br>
-        &copy; 2026 All Rights Reserved
+        <strong>v1.1.0</strong><br>Developer: Zahin<br>&copy; 2026 All Rights Reserved
       </div>
     </aside>
 
@@ -36,67 +30,91 @@
           <p>Real-time network states and single-click optimizers.</p>
         </header>
 
+        <div class="card mb-2" id="ispPanel">
+          <div class="card-action-header">
+            <h3>Live ISP & Connection Data</h3>
+            <button class="action-btn sm secondary" onclick="copyIspInfo()">Copy Info</button>
+          </div>
+          <div class="isp-grid mt-1">
+            <div class="isp-item"><span>Status:</span> <strong id="ispStatus">Loading...</strong></div>
+            <div class="isp-item"><span>Provider:</span> <strong id="ispName">Loading...</strong></div>
+            <div class="isp-item"><span>Location:</span> <strong id="ispLoc">Loading...</strong></div>
+            <div class="isp-item"><span>Connection:</span> <strong id="ispType">Loading...</strong></div>
+            <div class="isp-item"><span>Adapter:</span> <strong id="ispAdapter">Loading...</strong></div>
+            
+            <div class="isp-item highlight">
+              <span>Public IP:</span> 
+              <div>
+                <strong id="ispPublic" class="blurred">Loading...</strong>
+                <button class="action-btn sm secondary ml-1" id="toggleIpBtn" onclick="toggleIp('ispPublic')">Show</button>
+              </div>
+            </div>
+            
+            <div class="isp-item"><span>Local IPv4:</span> <strong id="ispIPv4">Loading...</strong></div>
+            <div class="isp-item"><span>Default Gateway:</span> <strong id="ispGw">Loading...</strong></div>
+            <div class="isp-item"><span>DNS Servers:</span> <strong id="ispDns">Loading...</strong></div>
+          </div>
+        </div>
+
         <div class="cards-grid">
           <div class="card">
             <h3>Quick Actions</h3>
-            <!-- REORDERED BUTTONS -->
             <div class="button-stack">
               <button class="action-btn secondary" onclick="checkCurrentDns()">Check Current DNS</button>
               <button class="action-btn" onclick="runRefresh()">Refresh Network</button>
               <button class="action-btn danger" onclick="runDeepRepair()">Deep Stack Repair</button>
             </div>
           </div>
-
           <div class="card">
             <div class="card-action-header">
               <h3>Check Updates</h3>
-              <!-- NEW PROFESSIONAL SYNC ICON -->
               <button class="icon-btn" id="updateSyncBtn" onclick="triggerUpdateCheck()" title="Refresh Updates">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="23 4 23 10 17 10"></polyline>
-                  <polyline points="1 20 1 14 7 14"></polyline>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  <path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
                 </svg>
               </button>
             </div>
-            <p id="updateStatusText" class="mt-1">Current Version: v1.0.0</p>
+            <p id="updateStatusText" class="mt-1">Current Version: v1.1.0</p>
             <button class="action-btn secondary mt-2" id="btnUpdate" onclick="triggerUpdate()" style="display:none;">Update Now</button>
           </div>
         </div>
 
         <div class="card log-card mt-2">
-          <h3>Execution Console</h3>
-          <div id="statusConsole" class="terminal-box">Ready. Select an action above.</div>
+          <div class="card-action-header">
+            <h3>Execution Console</h3>
+            <button class="action-btn sm secondary" onclick="copyConsole()">Copy Log</button>
+          </div>
+          <div id="statusConsole" class="terminal-box multi-line"></div>
         </div>
       </section>
 
-      <!-- DNS CONFIGURATOR TAB -->
+      <!-- DNS SWITCHER TAB -->
       <section id="tab-dns" class="tab-content">
         <header class="section-header">
           <h1>DNS Profiles</h1>
-          <p>Switch active adapter resolvers and flush DNS cache.</p>
         </header>
         <div class="cards-grid mb-2">
           <div class="card">
-            <h3>Cache Speed DNS</h3>
-            <p>Primary: 10.11.12.13<br>Secondary: 8.8.8.8</p>
-            <button class="action-btn" onclick="setDnsProfile('cache')">Apply Cache Profile</button>
+            <h3>Cache Speed DNS</h3><p>Primary: 10.11.12.13<br>Secondary: 8.8.8.8</p>
+            <button class="action-btn mt-1" onclick="setDnsProfile('cache')">Apply Cache</button>
           </div>
           <div class="card">
-            <h3>Raw Gaming DNS</h3>
-            <p>Primary: 1.1.1.1<br>Secondary: 8.8.8.8</p>
-            <button class="action-btn" onclick="setDnsProfile('raw')">Apply Raw Profile</button>
+            <h3>Raw Gaming DNS</h3><p>Primary: 1.1.1.1<br>Secondary: 8.8.8.8</p>
+            <button class="action-btn mt-1" onclick="setDnsProfile('raw')">Apply Raw</button>
           </div>
           <div class="card">
-            <h3>DHCP Automatic</h3>
-            <p>Revert adapter to router-assigned default DNS.</p>
-            <button class="action-btn secondary" onclick="setDnsProfile('dhcp')">Reset to Auto</button>
+            <h3>DHCP Automatic</h3><p>Revert adapter to router-assigned default DNS.</p>
+            <button class="action-btn secondary mt-1" onclick="setDnsProfile('dhcp')">Reset to Auto</button>
+          </div>
+          <div class="card">
+            <h3>Custom DNS</h3>
+            <input type="text" id="customPrimary" placeholder="Primary IP" class="form-input mt-1">
+            <input type="text" id="customSecondary" placeholder="Secondary IP (Optional)" class="form-input mt-1">
+            <button class="action-btn mt-1" style="width: 100%" onclick="applyCustomDns()">Apply Custom</button>
           </div>
         </div>
-        
         <div class="dns-visualizer" id="dnsVisualizer">
-          <div class="pulse-dot" id="dnsPulse"></div>
-          <span id="dnsVisualText">DNS Engine Ready</span>
+          <div class="pulse-dot" id="dnsPulse"></div><span id="dnsVisualText">DNS Engine Ready</span>
         </div>
       </section>
 
@@ -104,20 +122,20 @@
       <section id="tab-diagnostics" class="tab-content">
         <header class="section-header">
           <h1>Network Diagnostics</h1>
-          <p>Ping monitoring and bandwidth verification.</p>
         </header>
 
         <div class="card mb-2">
           <div class="card-action-header">
-            <h3>Pre-Game Route Latency</h3>
-            <button class="action-btn sm" onclick="runPingCheck()">Run Latency Check</button>
+            <h3>Active Routing Telemetry</h3>
+            <div>
+              <button class="action-btn sm secondary" onclick="togglePingSort()" title="Sort by Latency">Sort: ↕</button>
+              <button class="action-btn sm ml-1" onclick="runPingCheck()">Run Telemetry</button>
+            </div>
           </div>
-          <table class="diag-table">
-            <thead>
-              <tr><th>Target</th><th>IP Address</th><th>Latency</th><th>Packet Loss</th></tr>
-            </thead>
+          <table class="diag-table mt-1">
+            <thead><tr><th>Target</th><th>IP Address</th><th>Latency</th><th>Packet Loss</th></tr></thead>
             <tbody id="pingTableBody">
-              <tr><td colspan="4">Click "Run Latency Check" to gather telemetry.</td></tr>
+              <tr><td colspan="4">Click "Run Telemetry" to gather routing data.</td></tr>
             </tbody>
           </table>
         </div>
@@ -125,52 +143,37 @@
         <div class="cards-grid">
           <div class="card">
             <h3>BDIX SPEED</h3>
-            <!-- Added ID here to dynamically update the server name -->
-            <p class="target-sub" id="bdixTargetText">Target: Auto-selecting local node...</p>
+            <p class="target-sub" id="bdixTargetText">Target: Carnival Internet...</p>
             <button class="action-btn mt-1" onclick="runSpeedtest('bdix')">Test BDIX</button>
             <div id="bdixOutput" class="stat-readout">-- Mbps</div>
           </div>
           <div class="card">
             <h3>RAW SPEED</h3>
-            <p class="target-sub">Target: Singtel Singapore (ID: 13623)</p>
+            <p class="target-sub" id="sgTargetText">Target: Singtel Singapore...</p>
             <button class="action-btn mt-1" onclick="runSpeedtest('singapore')">Test Singapore</button>
             <div id="sgOutput" class="stat-readout">-- Mbps</div>
           </div>
         </div>
       </section>
 
-      <!-- SEPARATED HISTORY TAB -->
+      <!-- HISTORY TAB -->
       <section id="tab-history" class="tab-content">
-        <!-- Flexbox header to place the Clear button nicely on the right -->
         <header class="section-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
-          <div>
-            <h1>Activity History</h1>
-            <p>Review past diagnostics and routing performance.</p>
-          </div>
+          <div><h1>Activity History</h1></div>
           <button class="action-btn danger sm" onclick="clearHistory()">Clear History</button>
         </header>
-
         <div class="card mb-2">
           <h3>Speed Test History</h3>
           <table class="diag-table">
-            <thead>
-              <tr><th>Date & Time</th><th>Type</th><th>Download</th><th>Upload</th><th>Ping</th></tr>
-            </thead>
-            <tbody id="speedHistoryTableBody">
-              <!-- Speed History loads here -->
-            </tbody>
+            <thead><tr><th>Date & Time</th><th>Type</th><th>Download</th><th>Upload</th><th>Ping</th></tr></thead>
+            <tbody id="speedHistoryTableBody"></tbody>
           </table>
         </div>
-
         <div class="card">
           <h3>Ping Test History</h3>
           <table class="diag-table">
-            <thead>
-              <tr><th>Date & Time</th><th>Target</th><th>Latency</th><th>Packet Loss</th></tr>
-            </thead>
-            <tbody id="pingHistoryTableBody">
-              <!-- Ping History loads here -->
-            </tbody>
+            <thead><tr><th>Date & Time</th><th>Target</th><th>Latency</th><th>Packet Loss</th></tr></thead>
+            <tbody id="pingHistoryTableBody"></tbody>
           </table>
         </div>
       </section>

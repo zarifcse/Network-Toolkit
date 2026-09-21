@@ -176,3 +176,68 @@ body {
   animation: spin 1s linear infinite;
   color: var(--accent);
 }
+
+/* Form Inputs */
+.form-input {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 0.65rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+.form-input:focus {
+  border-color: var(--accent);
+}
+
+/* ==========================================
+   V1.1.0 NEW UI COMPONENTS
+   ========================================== */
+
+/* Multi-line Console */
+.terminal-box.multi-line {
+  min-height: 120px;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-family: monospace;
+  line-height: 1.5;
+  padding: 1rem;
+}
+.log-line { 
+  margin-bottom: 4px; 
+  border-bottom: 1px solid rgba(255,255,255,0.05); 
+  padding-bottom: 2px;
+}
+
+/* ISP Information Grid */
+.isp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.isp-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+}
+.isp-item strong { color: var(--text-main); font-weight: 500; }
+.isp-item.highlight strong { color: var(--accent); }
+
+/* Privacy Blur Effect */
+.blurred {
+  filter: blur(5px);
+  user-select: none;
+  transition: filter 0.2s ease;
+}
+
+/* Utilities */
+.xs { width: 24px; height: 24px; font-size: 0.7rem; background: none; border: none;}
+.ml-1 { margin-left: 0.5rem; }
