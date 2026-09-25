@@ -7,7 +7,7 @@ GITHUB_REPO = "zarifcse/Network-Toolkit"
 CURRENT_VERSION = "v1.1.1"
 
 def parse_version(v: str) -> tuple:
-    """Converts 'v1.1.0' into a numeric tuple (1, 1, 0) for accurate comparison."""
+    """Converts 'v1.1.1' into a numeric tuple (1, 1, 1) for accurate comparison."""
     try:
         clean = v.lstrip("v").strip()
         return tuple(int(x) for x in clean.split(".") if x.isdigit())
@@ -17,25 +17,33 @@ def parse_version(v: str) -> tuple:
 class UpdateManager:
     @staticmethod
     def check_for_updates() -> dict:
-        """Query the GitHub Releases API for a newer version tag."""
-        url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+        """
+        Query standard GitHub web routes instead of the API.
+        This completely bypasses the 60 requests/hour API rate limit.
+        """
+        # Notice we removed "api." and changed the path to the standard web releases page
+        url = f"https://github.com/{GITHUB_REPO}/releases/latest"
+        
         try:
-            resp = requests.get(url, timeout=5)
-            if resp.status_code != 200:
-                return {"update_available": False, "message": "Up to date."}
+            # allow_redirects=False captures the 302 Redirect header without downloading the webpage
+            resp = requests.get(url, allow_redirects=False, timeout=5)
             
-            data = resp.json()
-            latest_version = data.get("tag_name", "")
-            
-            # Strict version comparison: Only trigger if GitHub release is strictly GREATER
-            if latest_version and parse_version(latest_version) > parse_version(CURRENT_VERSION):
-                exe_asset = next((a for a in data.get("assets", []) if a["name"].endswith(".exe")), None)
-                if exe_asset:
+            if resp.status_code == 302:
+                redirect_url = resp.headers.get("Location", "")
+                
+                # The redirect URL ends with the tag name (e.g., .../releases/tag/v1.1.1)
+                latest_version = redirect_url.split("/")[-1]
+                
+                # Strict version comparison
+                if latest_version and parse_version(latest_version) > parse_version(CURRENT_VERSION):
+                    # Hardcode the expected asset download URL structure
+                    download_url = f"https://github.com/{GITHUB_REPO}/releases/download/{latest_version}/NetworkToolkit.exe"
+                    
                     return {
                         "update_available": True,
                         "latest_version": latest_version,
                         "current_version": CURRENT_VERSION,
-                        "download_url": exe_asset["browser_download_url"]
+                        "download_url": download_url
                     }
         except Exception as e:
             return {"update_available": False, "error": str(e)}
@@ -71,8 +79,6 @@ del "%~f0"
             bat_file.write(bat_content)
         
         # 3. Launch the script completely detached from the main application
-        # 0x08000000 = CREATE_NO_WINDOW
-        # 0x00000008 = DETACHED_PROCESS (Ensures the script survives when the app dies)
         subprocess.Popen(
             ["cmd.exe", "/c", bat_path],
             creationflags=0x08000000 | 0x00000008

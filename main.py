@@ -42,7 +42,7 @@ def main():
     
     # UPDATED: Added maximized=True to open full screen by default
     webview.create_window(
-        "Network Toolkit v1.1.0", 
+        "Network Toolkit v1.1.1", 
         url=frontend_path, 
         js_api=api, 
         width=1050, 

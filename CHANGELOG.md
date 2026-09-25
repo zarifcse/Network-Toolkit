@@ -5,6 +5,7 @@
 ### Fixed
 - Stabilized Windows WMI adapter detection for virtual networks.
 - Ensured future-proof semantic versioning for the auto-updater pipeline.
+- Completely bypassed the GitHub API 60-request/hour rate limit by migrating the Auto-Updater to a direct web-redirect engine.
 
 
 ## [1.1.0] - 2026-09-21
