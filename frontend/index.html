@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Network Toolkit v1.1.0</title>
+  <title>Network Toolkit v1.1.1</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -18,7 +18,7 @@
         <button class="nav-btn" onclick="switchTab('history')">History</button> 
       </nav>
       <div class="version-tag" id="versionBadge">
-        <strong>v1.1.0</strong><br>Developer: Zahin<br>&copy; 2026 All Rights Reserved
+        <strong>v1.1.1</strong><br>Developer: Zahin<br>&copy; 2026 All Rights Reserved
       </div>
     </aside>
 
@@ -33,7 +33,16 @@
         <div class="card mb-2" id="ispPanel">
           <div class="card-action-header">
             <h3>Live ISP & Connection Data</h3>
-            <button class="action-btn sm secondary" onclick="copyIspInfo()">Copy Info</button>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <!-- REFRESH BUTTON FOR ISP TELEMETRY -->
+              <button class="icon-btn" id="ispRefreshBtn" onclick="refreshIspData()" title="Refresh Network Data">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M23 4v6h-6"></path>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+              </button>
+              <button class="action-btn sm secondary" onclick="copyIspInfo()">Copy Info</button>
+            </div>
           </div>
           <div class="isp-grid mt-1">
             <div class="isp-item"><span>Status:</span> <strong id="ispStatus">Loading...</strong></div>
@@ -70,11 +79,12 @@
               <h3>Check Updates</h3>
               <button class="icon-btn" id="updateSyncBtn" onclick="triggerUpdateCheck()" title="Refresh Updates">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  <path d="M23 4v6h-6"></path>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
                 </svg>
               </button>
             </div>
-            <p id="updateStatusText" class="mt-1">Current Version: v1.1.0</p>
+            <p id="updateStatusText" class="mt-1">Current Version: v1.1.1</p>
             <button class="action-btn secondary mt-2" id="btnUpdate" onclick="triggerUpdate()" style="display:none;">Update Now</button>
           </div>
         </div>
@@ -129,7 +139,7 @@
             <h3>Active Routing Telemetry</h3>
             <div>
               <button class="action-btn sm secondary" onclick="togglePingSort()" title="Sort by Latency">Sort: ↕</button>
-              <button class="action-btn sm ml-1" onclick="runPingCheck()">Run Telemetry</button>
+              <button class="action-btn sm ml-1" onclick="runPingCheck()">Run Latency Check</button>
             </div>
           </div>
           <table class="diag-table mt-1">
@@ -150,7 +160,7 @@
           <div class="card">
             <h3>RAW SPEED</h3>
             <p class="target-sub" id="sgTargetText">Target: Singtel Singapore...</p>
-            <button class="action-btn mt-1" onclick="runSpeedtest('singapore')">Test Singapore</button>
+            <button class="action-btn mt-1" onclick="runSpeedtest('singapore')">Test RAW</button>
             <div id="sgOutput" class="stat-readout">-- Mbps</div>
           </div>
         </div>
@@ -177,7 +187,6 @@
           </table>
         </div>
       </section>
-      
     </main>
   </div>
   <script src="script.js"></script>

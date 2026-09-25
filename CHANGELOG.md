@@ -1,4 +1,13 @@
-﻿## [1.1.0] - 2026-09-21
+﻿# Changelog
+
+## [1.1.1] - Stability Patch
+
+### Fixed
+- Stabilized Windows WMI adapter detection for virtual networks.
+- Ensured future-proof semantic versioning for the auto-updater pipeline.
+
+
+## [1.1.0] - 2026-09-21
 
 ### Added
 - **Live ISP Dashboard:** Real-time extraction of Active Network Adapters, Local IPv4, Default Gateways, and Retail Provider names.

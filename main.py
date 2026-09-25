@@ -40,13 +40,15 @@ def main():
     base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     frontend_path = os.path.join(base_dir, "frontend", "index.html")
     
+    # UPDATED: Added maximized=True to open full screen by default
     webview.create_window(
         "Network Toolkit v1.1.0", 
         url=frontend_path, 
         js_api=api, 
         width=1050, 
         height=750, 
-        resizable=True
+        resizable=True,
+        maximized=True
     )
     webview.start()
 

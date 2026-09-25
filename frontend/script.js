@@ -1,4 +1,4 @@
-const CURRENT_VERSION = "v1.1.0";
+const CURRENT_VERSION = "v1.1.1";
 
 // ==========================================
 // CORE UI & CONSOLE LOGIC
@@ -35,6 +35,8 @@ window.addEventListener('pywebviewready', async () => {
 
 async function loadIspInfo() {
   document.getElementById('ispStatus').textContent = "Analyzing network...";
+  document.getElementById('ispStatus').style.color = "#94a3b8";
+
   const data = await pywebview.api.get_isp_info();
   
   document.getElementById('ispStatus').textContent = data.status;
@@ -48,6 +50,23 @@ async function loadIspInfo() {
   document.getElementById('ispGw').textContent = data.gateway;
   document.getElementById('ispDns').textContent = data.dns;
   document.getElementById('ispPublic').textContent = data.public_ip;
+}
+
+// MANUAL REFRESH HANDLER FOR ISP PANEL
+async function refreshIspData() {
+  const btn = document.getElementById('ispRefreshBtn');
+  if (btn) btn.classList.add('spinning');
+  
+  log("Querying updated adapter and public ISP telemetry...");
+  
+  try {
+    await loadIspInfo();
+    log("Live network data updated successfully.");
+  } catch (err) {
+    log(`[ERROR] Network refresh failed: ${err}`);
+  } finally {
+    if (btn) btn.classList.remove('spinning');
+  }
 }
 
 function toggleIp(id) {
@@ -78,7 +97,7 @@ async function triggerUpdateCheck() {
   btn.classList.add('spinning');
   statusEl.innerHTML = "Checking for updates...";
   
-  await new Promise(r => setTimeout(r, 1500)); // Delay for UX Polish
+  await new Promise(r => setTimeout(r, 1500));
   
   const res = await pywebview.api.check_updates();
   if (res.update_available) {
@@ -216,7 +235,6 @@ async function runSpeedtest(target) {
   const targetText = document.getElementById(isSg ? 'sgTargetText' : 'bdixTargetText');
   const typeName = isSg ? "RAW Speed" : "BDIX Speed";
   
-  // Notice this will safely stay as "Testing..." if another test is currently running
   display.textContent = "Testing...";
 
   if (!isSg) {
@@ -279,12 +297,14 @@ async function saveSpeedHistory(type, down, up, ping) {
   await pywebview.api.save_history(h);
   loadHistory();
 }
+
 async function savePingHistory(target, latency, loss) {
   const h = await pywebview.api.load_history();
   h.ping.push({ date: new Date().toLocaleTimeString(), target, latency, loss });
   await pywebview.api.save_history(h);
   loadHistory();
 }
+
 async function clearHistory() {
   if(confirm("Permanently wipe all diagnostic records?")) {
     await pywebview.api.clear_history();

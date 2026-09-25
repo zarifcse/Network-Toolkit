@@ -5,11 +5,10 @@ import zipfile
 import subprocess
 import threading
 import base64
+import socket
 
 class NetworkManager:
-    # A strict Thread Lock that acts as a Queue.
-    # If both buttons are pressed, it forces one to wait for the other, 
-    # completely preventing Ookla from issuing a "Too Many Requests" IP ban.
+    # Strict Thread Lock prevents Ookla from issuing a "Too Many Requests" IP ban
     _speedtest_queue_lock = threading.Lock()
 
     @staticmethod
@@ -28,10 +27,10 @@ class NetworkManager:
     @classmethod
     def set_dns(cls, primary: str, secondary: str | None = None) -> dict:
         if primary.lower() == "dhcp":
-            cmd = "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Set-DnsClientServerAddress -ResetServerAddresses\""
+            cmd = "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-WmiObject Win32_NetworkAdapterConfiguration -Filter 'IPEnabled=True' | Invoke-WmiMethod -Name SetDNSServerSearchOrder\""
         else:
             sec_str = f", '{secondary}'" if secondary else ""
-            cmd = f"powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-NetAdapter -Physical | Where-Object {{ $_.Status -eq 'Up' }} | Set-DnsClientServerAddress -ServerAddresses ('{primary}'{sec_str})\""
+            cmd = f"powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-WmiObject Win32_NetworkAdapterConfiguration -Filter 'IPEnabled=True' | Invoke-WmiMethod -Name SetDNSServerSearchOrder -ArgumentList @(,'{primary}'{sec_str})\""
         
         success, out = cls.run_command(cmd)
         cls.run_command("ipconfig /flushdns")
@@ -40,7 +39,7 @@ class NetworkManager:
 
     @classmethod
     def get_current_dns(cls) -> dict:
-        ps_cmd = "(Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | Get-DnsClientServerAddress -AddressFamily IPv4).ServerAddresses -join ', '"
+        ps_cmd = "(Get-WmiObject Win32_NetworkAdapterConfiguration -Filter 'IPEnabled=True' | Where-Object {$_.DNSServerSearchOrder -ne $null} | Select-Object -ExpandProperty DNSServerSearchOrder) -join ', '"
         success, out = cls.run_command(f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{ps_cmd}"')
         if success and out.strip(): return {"status": "success", "message": f"Active DNS: {out.strip()}"}
         return {"status": "success", "message": "Active DNS: Automatic (DHCP)"}
@@ -73,32 +72,58 @@ class NetworkManager:
             "isp_name": "Unknown", "location": "Unknown"
         }
 
-        ps_script = """
+        # 1. Native OS Socket Probe: Identifies the active outbound interface IP immediately
+        active_local_ip = "Unknown"
+        try:
+            probe_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            probe_sock.connect(("8.8.8.8", 80))
+            active_local_ip = probe_sock.getsockname()[0]
+            probe_sock.close()
+            data["local_ipv4"] = active_local_ip
+        except Exception:
+            pass
+
+        # 2. Kernel WMI Engine: Matches the IP strictly to the Hardware Configuration
+        ps_script = f"""
         $ErrorActionPreference = 'SilentlyContinue'
-        $net = Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Sort-Object RouteMetric | Select-Object -First 1
-        if ($net) {
-            $ip = Get-NetIPAddress -InterfaceIndex $net.InterfaceIndex -AddressFamily IPv4 | Sort-Object PrefixOrigin -Descending | Select-Object -First 1
-            $ipv4 = $ip.IPAddress
-            $gw = $net.NextHop
-            $dns = (Get-DnsClientServerAddress -InterfaceIndex $net.InterfaceIndex -AddressFamily IPv4).ServerAddresses -join ', '
-            $adapter = (Get-NetAdapter -InterfaceIndex $net.InterfaceIndex).InterfaceDescription
-            $type = if ($adapter -match 'Wi-Fi|Wireless|802.11|WLAN') { 'Wi-Fi' } else { 'Ethernet' }
-            @{ Adapter=$adapter; Type=$type; IPv4=$ipv4; GW=$gw; DNS=$dns } | ConvertTo-Json -Compress
-        }
+        $activeIp = '{active_local_ip}'
+        
+        $config = Get-WmiObject Win32_NetworkAdapterConfiguration -Filter "IPEnabled = True" | Where-Object {{ $_.IPAddress -contains $activeIp }} | Select-Object -First 1
+
+        if (-not $config) {{
+            $config = Get-WmiObject Win32_NetworkAdapterConfiguration -Filter "IPEnabled = True" | Where-Object {{ $_.DefaultIPGateway -ne $null }} | Select-Object -First 1
+        }}
+
+        if ($config) {{
+            $adapter = Get-WmiObject Win32_NetworkAdapter -Filter "Index = $($config.Index)" | Select-Object -First 1
+            $desc = if ($adapter -and $adapter.Name) {{ $adapter.Name }} else {{ $config.Description }}
+            $type = if ($desc -match 'Wi-Fi|Wireless|802.11|WLAN') {{ 'Wi-Fi' }} else {{ 'Ethernet' }}
+            
+            $ipv4 = if ($activeIp -ne 'Unknown') {{ $activeIp }} else {{ $config.IPAddress[0] }}
+            $gw = if ($config.DefaultIPGateway) {{ $config.DefaultIPGateway[0] }} else {{ 'Unknown' }}
+            $dns = if ($config.DNSServerSearchOrder) {{ $config.DNSServerSearchOrder -join ', ' }} else {{ 'Automatic (DHCP)' }}
+
+            @{{ Adapter=$desc; Type=$type; IPv4=$ipv4; GW=$gw; DNS=$dns }} | ConvertTo-Json -Compress
+        }} else {{
+            @{{ Adapter='Unknown'; Type='Unknown'; IPv4=$activeIp; GW='Unknown'; DNS='Automatic (DHCP)' }} | ConvertTo-Json -Compress
+        }}
         """
+
         encoded_ps = base64.b64encode(ps_script.encode('utf-16le')).decode('utf-8')
         success, out = cls.run_command(f"powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded_ps}")
         
         if success and out.strip():
             try:
-                local_data = json.loads(out)
+                local_data = json.loads(out.strip())
                 data["adapter"] = local_data.get("Adapter", "Unknown")
                 data["type"] = local_data.get("Type", "Unknown")
-                data["local_ipv4"] = local_data.get("IPv4", "Unknown")
+                data["local_ipv4"] = local_data.get("IPv4", active_local_ip)
                 data["gateway"] = local_data.get("GW", "Unknown")
                 data["dns"] = local_data.get("DNS", "Unknown") if local_data.get("DNS") else "Automatic (DHCP)"
-            except: pass
+            except Exception:
+                pass
 
+        # 3. Public IP and Retail Provider Identification (Restored to ipinfo.io)
         try:
             req = urllib.request.Request("https://ipinfo.io/json", headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=5) as response:
@@ -109,8 +134,17 @@ class NetworkManager:
                     org = org.split(" ", 1)[1]
                 data["isp_name"] = org
                 data["location"] = f"{ipinfo.get('city', 'Unknown')}, {ipinfo.get('country', 'Unknown')}"
-        except:
-            data["status"] = "Offline"
+        except Exception:
+            # Fallback if ipinfo.io cannot be reached
+            try:
+                req = urllib.request.Request("http://ip-api.com/json/?fields=status,country,city,isp,org,query", headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    fallback_info = json.loads(response.read().decode())
+                    data["public_ip"] = fallback_info.get("query", "Unknown")
+                    data["isp_name"] = fallback_info.get("org") or fallback_info.get("isp", "Unknown")
+                    data["location"] = f"{fallback_info.get('city', 'Unknown')}, {fallback_info.get('country', 'Unknown')}"
+            except Exception:
+                data["status"] = "Offline"
 
         return data
 
@@ -161,7 +195,6 @@ class NetworkManager:
         os.makedirs(app_dir, exist_ok=True)
         base_exe = os.path.join(app_dir, "speedtest.exe")
 
-        # ENTIRE EXECUTION WRAPPED IN LOCK to prevent Ookla IP bans
         with cls._speedtest_queue_lock:
             if not os.path.exists(base_exe):
                 zip_url = "https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-win64.zip"
@@ -179,31 +212,25 @@ class NetworkManager:
             
             cmd = [base_exe, "--format=json", "--accept-license", "--accept-gdpr"]
             
-            # Static Server Enforcement
-            # We omit the BDIX hardcode so Ookla auto-selects the fastest available local server, preventing crashes.
             if target == "singapore":
-                cmd.extend(["-s", "13623"]) # Singtel Singapore
+                cmd.extend(["-s", "13623"])
 
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True, shell=False, creationflags=subprocess.CREATE_NO_WINDOW)
                 out = result.stdout
                 err = result.stderr
                 
-                # Check for direct text-based API bans before JSON parsing
                 if "Too many requests" in out or "Too many requests" in err:
                     return {"status": "error", "message": "Ookla Anti-Spam: Please wait 60 seconds before testing again."}
                 
                 if not out.strip():
                     return {"status": "error", "message": f"No output. Error: {err.strip()}"}
 
-                # Parse JSON output
                 for line in out.splitlines():
                     line = line.strip()
                     if line.startswith("{") and line.endswith("}"):
                         try:
                             data = json.loads(line)
-                            
-                            # Clean error handling for offline servers
                             if "error" in data or data.get("type") == "log":
                                 msg = data.get("message", "Server timed out.")
                                 if "NoServersException" in msg:
@@ -217,7 +244,7 @@ class NetworkManager:
                                 "ping_ms": round(data["ping"]["latency"], 1),
                                 "server": f"{data['server'].get('sponsor', data['server'].get('name'))} ({data['server']['location']})"
                             }
-                        except:
+                        except Exception:
                             continue
                 
                 return {"status": "error", "message": "Failed to parse test results."}
@@ -234,7 +261,7 @@ class NetworkManager:
         if os.path.exists(history_file):
             try:
                 with open(history_file, "r") as f: return json.load(f)
-            except: pass
+            except Exception: pass
         return {"speed": [], "ping": []}
 
     @classmethod

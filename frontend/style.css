@@ -113,7 +113,7 @@ body {
 .mt-2 { margin-top: 1.5rem; }
 .mb-2 { margin-bottom: 1.5rem; }
 
-/* Circular Refresh Button */
+/* Circular Buttons */
 .icon-btn {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-color);
@@ -170,7 +170,7 @@ body {
   font-style: italic;
 }
 
-/* Update Sync Spin Animation */
+/* Spin Animation */
 @keyframes spin { 100% { transform: rotate(360deg); } }
 .icon-btn.spinning svg {
   animation: spin 1s linear infinite;
@@ -192,10 +192,6 @@ body {
 .form-input:focus {
   border-color: var(--accent);
 }
-
-/* ==========================================
-   V1.1.0 NEW UI COMPONENTS
-   ========================================== */
 
 /* Multi-line Console */
 .terminal-box.multi-line {
