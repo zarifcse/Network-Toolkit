@@ -9,14 +9,21 @@ from backend.updater import UpdateManager
 # ADMIN PERMISSION CHECK (RUNS FIRST)
 # ==========================================
 def is_admin():
-    try: return ctypes.windll.shell32.IsUserAnAdmin() != 0
-    except: return False
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except:
+        return False
 
 if not is_admin():
-    executable = sys.executable
-    if executable.lower().endswith("python.exe"):
-        executable = executable.replace("python.exe", "pythonw.exe")
-    ctypes.windll.shell32.ShellExecuteW(None, "runas", executable, f'"{os.path.abspath(__file__)}"', None, 1)
+    if getattr(sys, 'frozen', False):
+        # Compiled EXE: Relaunch the executable itself with admin rights
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, None, None, 1)
+    else:
+        # Dev Mode: Relaunch Python script via pythonw.exe
+        executable = sys.executable
+        if executable.lower().endswith("python.exe"):
+            executable = executable.replace("python.exe", "pythonw.exe")
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", executable, f'"{os.path.abspath(__file__)}"', None, 1)
     sys.exit()
 
 class BridgeAPI:
@@ -40,7 +47,6 @@ def main():
     base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     frontend_path = os.path.join(base_dir, "frontend", "index.html")
     
-    # UPDATED: Added maximized=True to open full screen by default
     webview.create_window(
         "Network Toolkit v1.1.1", 
         url=frontend_path, 

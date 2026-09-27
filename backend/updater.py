@@ -1,5 +1,6 @@
 import os
 import sys
+import base64
 import subprocess
 import requests
 
@@ -56,17 +57,25 @@ class UpdateManager:
     @staticmethod
     def apply_update(download_url: str) -> dict:
         """
-        Streams the new binary with strict timeouts, validates payload size,
-        and initiates a PID-targeted PowerShell hand-off before exiting.
+        Streams new binary, performs payload validation, clears running file locks,
+        retries replacement up to 10 times, and relaunches with UAC elevation.
         """
+        # Safety Guard: Never allow script-mode testing to overwrite python.exe
+        if not getattr(sys, 'frozen', False):
+            return {
+                "status": "error",
+                "message": "Auto-update only runs from the compiled .exe, not in Python script mode."
+            }
+
         temp_dir = os.environ.get("TEMP", os.getcwd())
         temp_exe = os.path.join(temp_dir, "NetworkToolkit_update.exe")
         current_exe = os.path.abspath(sys.executable)
-        current_pid = os.getpid()
+        exe_name = os.path.splitext(os.path.basename(current_exe))[0]
+        log_file = os.path.join(temp_dir, "network_toolkit_update.log")
 
         try:
             # 1. Stream download with connection and chunk timeouts
-            with requests.get(download_url, headers=HTTP_HEADERS, stream=True, timeout=15) as r:
+            with requests.get(download_url, headers=HTTP_HEADERS, stream=True, timeout=20) as r:
                 r.raise_for_status()
                 with open(temp_exe, "wb") as f:
                     for chunk in r.iter_content(chunk_size=65536):
@@ -77,26 +86,48 @@ class UpdateManager:
             if not os.path.exists(temp_exe) or os.path.getsize(temp_exe) < 3 * 1024 * 1024:
                 if os.path.exists(temp_exe):
                     os.remove(temp_exe)
-                return {"status": "error", "message": "Incomplete or corrupted download."}
+                return {"status": "error", "message": "Incomplete or corrupted download package from GitHub."}
 
-            # 3. PID-Targeted PowerShell hand-off:
-            # - Waits explicitly for current process PID to clear memory and file locks
-            # - Forces binary overwrite
-            # - Relaunches the updated executable
-            ps_command = (
-                f"$ErrorActionPreference = 'Stop'; "
-                f"try {{ Wait-Process -Id {current_pid} -Timeout 10 }} catch {{ }}; "
-                f"Start-Sleep -Milliseconds 600; "
-                f"Move-Item -LiteralPath '{temp_exe}' -Destination '{current_exe}' -Force; "
-                f"Start-Process -FilePath '{current_exe}'"
+            # 3. Robust, decoupled PowerShell hand-off:
+            # - Waits up to 15s for all processes bearing this binary's name to exit
+            # - Retries file swap up to 10 times (500ms intervals) to handle antivirus file holds
+            # - Re-elevates with -Verb RunAs for UAC admin rights
+            # - Logs step status directly to %TEMP%\network_toolkit_update.log
+            ps_script = (
+                f"$log = '{log_file}'; "
+                f"'[START] Update hand-off initiated' | Out-File $log; "
+                f"$timeout = 15; $sw = [System.Diagnostics.Stopwatch]::StartNew(); "
+                f"while ((Get-Process -Name '{exe_name}' -ErrorAction SilentlyContinue) -and ($sw.Elapsed.TotalSeconds -lt $timeout)) {{ "
+                f"  Start-Sleep -Milliseconds 300; "
+                f"}} "
+                f"'[PROCESS] All process instances cleared' | Out-File $log -Append; "
+                f"$replaced = $false; "
+                f"for ($i = 0; $i -lt 10; $i++) {{ "
+                f"  try {{ "
+                f"    Copy-Item -LiteralPath '{temp_exe}' -Destination '{current_exe}' -Force -ErrorAction Stop; "
+                f"    Remove-Item -LiteralPath '{temp_exe}' -Force -ErrorAction SilentlyContinue; "
+                f"    $replaced = $true; "
+                f"    '[COPIED] Executable replaced successfully' | Out-File $log -Append; "
+                f"    break; "
+                f"  }} catch {{ "
+                f"    Start-Sleep -Milliseconds 500; "
+                f"  }} "
+                f"}} "
+                f"if ($replaced) {{ "
+                f"  '[LAUNCH] Relaunching application with admin privileges' | Out-File $log -Append; "
+                f"  Start-Process -FilePath '{current_exe}' -Verb RunAs; "
+                f"}} else {{ "
+                f"  '[ERROR] Failed to overwrite binary file' | Out-File $log -Append; "
+                f"}}"
             )
+            encoded_cmd = base64.b64encode(ps_script.encode('utf-16le')).decode('ascii')
 
             subprocess.Popen(
-                ["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_command],
+                ["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", encoded_cmd],
                 creationflags=subprocess.CREATE_NO_WINDOW | 0x00000008  # DETACHED_PROCESS
             )
 
-            # 4. Terminate process immediately to release file lock
+            # 4. Immediate kernel exit to clear the current executable file lock
             os._exit(0)
 
         except Exception as e:

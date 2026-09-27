@@ -1,4 +1,5 @@
 const CURRENT_VERSION = "v1.1.1";
+let pendingUpdateUrl = null;
 
 // ==========================================
 // CORE UI & CONSOLE LOGIC
@@ -6,20 +7,27 @@ const CURRENT_VERSION = "v1.1.1";
 function switchTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-  document.getElementById(`tab-${tabName}`).classList.add('active');
-  if (event && event.currentTarget) { event.currentTarget.classList.add('active'); }
+  
+  const targetTab = document.getElementById(`tab-${tabName}`);
+  if (targetTab) targetTab.classList.add('active');
+  
+  if (window.event && window.event.currentTarget) { 
+    window.event.currentTarget.classList.add('active'); 
+  }
 }
 
 function log(msg) {
   const terminal = document.getElementById('statusConsole');
+  if (!terminal) return;
   const time = new Date().toLocaleTimeString();
   terminal.innerHTML += `<div class="log-line"><span style="color:#64748b;">[${time}]</span> ${msg}</div>`;
   terminal.scrollTop = terminal.scrollHeight; 
 }
 
 function copyConsole() {
-  const text = document.getElementById('statusConsole').innerText;
-  navigator.clipboard.writeText(text);
+  const terminal = document.getElementById('statusConsole');
+  if (!terminal) return;
+  navigator.clipboard.writeText(terminal.innerText);
   log("Console log copied to clipboard.");
 }
 
@@ -34,25 +42,33 @@ window.addEventListener('pywebviewready', async () => {
 });
 
 async function loadIspInfo() {
-  document.getElementById('ispStatus').textContent = "Analyzing network...";
-  document.getElementById('ispStatus').style.color = "#94a3b8";
+  const statusEl = document.getElementById('ispStatus');
+  if (statusEl) {
+    statusEl.textContent = "Analyzing network...";
+    statusEl.style.color = "#94a3b8";
+  }
 
-  const data = await pywebview.api.get_isp_info();
-  
-  document.getElementById('ispStatus').textContent = data.status;
-  document.getElementById('ispStatus').style.color = data.status === "Online" ? "#4ade80" : "#ef4444";
-  
-  document.getElementById('ispName').textContent = data.isp_name;
-  document.getElementById('ispLoc').textContent = data.location;
-  document.getElementById('ispType').textContent = data.type;
-  document.getElementById('ispAdapter').textContent = data.adapter;
-  document.getElementById('ispIPv4').textContent = data.local_ipv4;
-  document.getElementById('ispGw').textContent = data.gateway;
-  document.getElementById('ispDns').textContent = data.dns;
-  document.getElementById('ispPublic').textContent = data.public_ip;
+  try {
+    const data = await pywebview.api.get_isp_info();
+    
+    if (statusEl) {
+      statusEl.textContent = data.status || "N/A";
+      statusEl.style.color = data.status === "Online" ? "#4ade80" : "#ef4444";
+    }
+    
+    document.getElementById('ispName').textContent = data.isp_name || "N/A";
+    document.getElementById('ispLoc').textContent = data.location || "N/A";
+    document.getElementById('ispType').textContent = data.type || "N/A";
+    document.getElementById('ispAdapter').textContent = data.adapter || "N/A";
+    document.getElementById('ispIPv4').textContent = data.local_ipv4 || "N/A";
+    document.getElementById('ispGw').textContent = data.gateway || "N/A";
+    document.getElementById('ispDns').textContent = data.dns || "N/A";
+    document.getElementById('ispPublic').textContent = data.public_ip || "N/A";
+  } catch (err) {
+    log(`[ERROR] Failed to fetch ISP telemetry: ${err}`);
+  }
 }
 
-// MANUAL REFRESH HANDLER FOR ISP PANEL
 async function refreshIspData() {
   const btn = document.getElementById('ispRefreshBtn');
   if (btn) btn.classList.add('spinning');
@@ -72,6 +88,8 @@ async function refreshIspData() {
 function toggleIp(id) {
   const el = document.getElementById(id);
   const btn = document.getElementById('toggleIpBtn');
+  if (!el || !btn) return;
+
   if (el.classList.contains('blurred')) {
     el.classList.remove('blurred');
     btn.textContent = 'Hide';
@@ -82,34 +100,85 @@ function toggleIp(id) {
 }
 
 function copyIspInfo() {
-  const text = `ISP: ${document.getElementById('ispName').innerText}\nIP: ${document.getElementById('ispPublic').innerText}\nLocal IP: ${document.getElementById('ispIPv4').innerText}\nGateway: ${document.getElementById('ispGw').innerText}`;
+  const ispName = document.getElementById('ispName')?.innerText || "N/A";
+  const ispPublic = document.getElementById('ispPublic')?.innerText || "N/A";
+  const ispIPv4 = document.getElementById('ispIPv4')?.innerText || "N/A";
+  const ispGw = document.getElementById('ispGw')?.innerText || "N/A";
+
+  const text = `ISP: ${ispName}\nIP: ${ispPublic}\nLocal IP: ${ispIPv4}\nGateway: ${ispGw}`;
   navigator.clipboard.writeText(text);
   log("ISP Network Information copied to clipboard.");
 }
 
 // ==========================================
-// QUICK ACTIONS & UPDATES
+// QUICK ACTIONS & AUTO-UPDATE
 // ==========================================
 async function triggerUpdateCheck() {
   const btn = document.getElementById('updateSyncBtn');
   const statusEl = document.getElementById('updateStatusText');
+  const updateBtn = document.getElementById('btnUpdate');
   
-  btn.classList.add('spinning');
-  statusEl.innerHTML = "Checking for updates...";
+  if (btn) btn.classList.add('spinning');
+  if (statusEl) statusEl.innerHTML = "Checking for updates...";
   
   await new Promise(r => setTimeout(r, 1500));
   
-  const res = await pywebview.api.check_updates();
-  if (res.update_available) {
-    statusEl.innerHTML = `Current: ${CURRENT_VERSION} <br><strong>New Release: ${res.latest_version} ready.</strong>`;
-    document.getElementById('btnUpdate').style.display = 'inline-block';
-  } else {
-    statusEl.innerHTML = `Current Version: ${CURRENT_VERSION} <br><span style="color: #4ade80; font-size: 0.85rem;">App is fully up-to-date.</span>`;
+  try {
+    const res = await pywebview.api.check_updates();
+    if (res && res.update_available) {
+      pendingUpdateUrl = res.download_url;
+      if (statusEl) {
+        statusEl.innerHTML = `Current: ${CURRENT_VERSION} <br><strong>New Release: ${res.latest_version} ready.</strong>`;
+      }
+      if (updateBtn) updateBtn.style.display = 'inline-block';
+    } else {
+      pendingUpdateUrl = null;
+      if (statusEl) {
+        statusEl.innerHTML = `Current Version: ${CURRENT_VERSION} <br><span style="color: #4ade80; font-size: 0.85rem;">App is fully up-to-date.</span>`;
+      }
+      if (updateBtn) updateBtn.style.display = 'none';
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = `Current: ${CURRENT_VERSION} <br><span style="color: #ef4444; font-size: 0.85rem;">Check failed: Server unreachable.</span>`;
+    }
+    log(`[ERROR] Update check failed: ${err}`);
+  } finally {
+    if (btn) btn.classList.remove('spinning');
   }
-  btn.classList.remove('spinning');
 }
 
-function triggerUpdate() { log("Applying update..."); pywebview.api.apply_update(); }
+async function triggerUpdate() {
+  if (!pendingUpdateUrl) {
+    log("[ERROR] No valid release package URL available.");
+    return;
+  }
+
+  const btn = document.getElementById('btnUpdate');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "Downloading...";
+  }
+
+  log("Downloading update package from GitHub (approx. 15-25 MB)...");
+
+  try {
+    const res = await pywebview.api.apply_update(pendingUpdateUrl);
+    if (res && res.status === "error") {
+      log(`[ERROR] ${res.message}`);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Update Now";
+      }
+    }
+  } catch (err) {
+    log(`[ERROR] Update failed: ${err}`);
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = "Update Now";
+    }
+  }
+}
 
 async function runRefresh() {
   log("Refreshing network adapters...");
@@ -137,26 +206,32 @@ async function applyDnsVisuals(actionPromise, profileName) {
   const visText = document.getElementById('dnsVisualText');
   const pulse = document.getElementById('dnsPulse');
   
-  visualizer.classList.add('active');
-  visText.textContent = `Applying ${profileName} profile...`;
+  if (visualizer) visualizer.classList.add('active');
+  if (visText) visText.textContent = `Applying ${profileName} profile...`;
   
   const res = await actionPromise;
   
   if (res.status === 'success') {
-    visText.textContent = `Success: ${profileName} applied.`;
+    if (visText) visText.textContent = `Success: ${profileName} applied.`;
     log(res.message);
   } else {
-    visualizer.style.borderColor = 'var(--danger)';
-    visualizer.style.color = 'var(--danger)';
-    pulse.style.background = 'var(--danger)';
-    visText.textContent = "Error: Admin Rights Required";
+    if (visualizer) {
+      visualizer.style.borderColor = 'var(--danger)';
+      visualizer.style.color = 'var(--danger)';
+    }
+    if (pulse) pulse.style.background = 'var(--danger)';
+    if (visText) visText.textContent = "Error: Admin Rights Required";
     log(`[ERROR] ${res.message}`);
   }
   
   setTimeout(() => {
-    visualizer.classList.remove('active');
-    visualizer.style.borderColor = ''; visualizer.style.color = ''; pulse.style.background = '';
-    visText.textContent = "DNS Engine Ready";
+    if (visualizer) {
+      visualizer.classList.remove('active');
+      visualizer.style.borderColor = ''; 
+      visualizer.style.color = ''; 
+    }
+    if (pulse) pulse.style.background = '';
+    if (visText) visText.textContent = "DNS Engine Ready";
   }, 4000);
 }
 
@@ -194,10 +269,10 @@ async function runPingCheck() {
 }
 
 function togglePingSort() {
-  if(currentPingResults.length === 0) return;
+  if (currentPingResults.length === 0) return;
   pingSortState = (pingSortState + 1) % 3;
   
-  if(pingSortState === 0) {
+  if (pingSortState === 0) {
     log("Ping table restored to default order.");
   } else {
     currentPingResults.sort((a, b) => {
@@ -212,6 +287,7 @@ function togglePingSort() {
 
 async function renderPingTable() {
   const tbody = document.getElementById('pingTableBody');
+  if (!tbody) return;
   tbody.innerHTML = "";
   for (const r of currentPingResults) {
     const color = r.packet_loss === '0%' ? '#4ade80' : (r.packet_loss === 'N/A' ? '#64748b' : '#ef4444');
@@ -220,7 +296,7 @@ async function renderPingTable() {
       <td><strong>${r.latency}</strong></td>
       <td><span style="color: ${color}">${r.packet_loss}</span></td>
     </tr>`;
-    if(pingSortState === 0 && r.latency !== "N/A") { 
+    if (pingSortState === 0 && r.latency !== "N/A") { 
       await savePingHistory(r.name, r.latency, r.packet_loss); 
     }
   }
@@ -235,40 +311,40 @@ async function runSpeedtest(target) {
   const targetText = document.getElementById(isSg ? 'sgTargetText' : 'bdixTargetText');
   const typeName = isSg ? "RAW Speed" : "BDIX Speed";
   
-  display.textContent = "Testing...";
+  if (display) display.textContent = "Testing...";
 
   if (!isSg) {
-      targetText.textContent = "Target: Auto-selecting local BDIX node (Queued...)";
-      log(`Initializing BDIX bandwidth test protocol...`);
-      
-      const res = await pywebview.api.run_speedtest("bdix"); 
-      
-      if (res.status === 'success') {
-          display.textContent = `${res.download_mbps} Mbps`;
-          targetText.textContent = `Target: ${res.server}`; 
-          log(`BDIX Result [${res.server.split(' ')[0]}]: ${res.download_mbps} Mbps Down | ${res.upload_mbps} Mbps Up`);
-          saveSpeedHistory(typeName, `${res.download_mbps} Mbps`, `${res.upload_mbps} Mbps`, res.ping_ms);
-      } else {
-          display.textContent = "Error";
-          targetText.textContent = "Target: Test Failed";
-          log(`BDIX Error: ${res.message}`);
-      }
+    if (targetText) targetText.textContent = "Target: Carnival Internet (Queued...)";
+    log("Initializing BDIX bandwidth test protocol...");
+    
+    const res = await pywebview.api.run_speedtest("bdix"); 
+    
+    if (res.status === 'success') {
+      if (display) display.textContent = `${res.download_mbps} Mbps`;
+      if (targetText) targetText.textContent = `Target: ${res.server}`; 
+      log(`BDIX Result [${res.server.split(' ')[0]}]: ${res.download_mbps} Mbps Down | ${res.upload_mbps} Mbps Up`);
+      saveSpeedHistory(typeName, `${res.download_mbps} Mbps`, `${res.upload_mbps} Mbps`, res.ping_ms);
+    } else {
+      if (display) display.textContent = "Error";
+      if (targetText) targetText.textContent = "Target: Test Failed";
+      log(`BDIX Error: ${res.message}`);
+    }
   } else {
-      targetText.textContent = "Target: Singtel Singapore (Queued...)";
-      log(`Initializing RAW bandwidth test on Singtel...`);
-      
-      const res = await pywebview.api.run_speedtest("singapore");
-      
-      if(res.status === 'success') {
-          display.textContent = `${res.download_mbps} Mbps`;
-          targetText.textContent = `Target: ${res.server}`; 
-          log(`RAW Result [Singtel]: ${res.download_mbps} Mbps Down | ${res.upload_mbps} Mbps Up`);
-          saveSpeedHistory(typeName, `${res.download_mbps} Mbps`, `${res.upload_mbps} Mbps`, res.ping_ms);
-      } else {
-          display.textContent = "Error";
-          targetText.textContent = "Target: Test Failed";
-          log(`RAW Error: ${res.message}`);
-      }
+    if (targetText) targetText.textContent = "Target: Singtel Singapore (Queued...)";
+    log("Initializing RAW bandwidth test on Singtel...");
+    
+    const res = await pywebview.api.run_speedtest("singapore");
+    
+    if (res.status === 'success') {
+      if (display) display.textContent = `${res.download_mbps} Mbps`;
+      if (targetText) targetText.textContent = `Target: ${res.server}`; 
+      log(`RAW Result [Singtel]: ${res.download_mbps} Mbps Down | ${res.upload_mbps} Mbps Up`);
+      saveSpeedHistory(typeName, `${res.download_mbps} Mbps`, `${res.upload_mbps} Mbps`, res.ping_ms);
+    } else {
+      if (display) display.textContent = "Error";
+      if (targetText) targetText.textContent = "Target: Test Failed";
+      log(`RAW Error: ${res.message}`);
+    }
   }
 }
 
@@ -279,16 +355,20 @@ async function loadHistory() {
   const history = await pywebview.api.load_history();
   
   const sBody = document.getElementById('speedHistoryTableBody');
-  sBody.innerHTML = history.speed.length ? '' : '<tr><td colspan="5">No data available.</td></tr>';
-  [...history.speed].reverse().forEach(e => {
-    sBody.innerHTML += `<tr><td>${e.date}</td><td><strong>${e.type}</strong></td><td style="color:#38bdf8;">${e.down}</td><td>${e.up}</td><td>${e.ping} ms</td></tr>`;
-  });
+  if (sBody) {
+    sBody.innerHTML = history.speed.length ? '' : '<tr><td colspan="5">No data available.</td></tr>';
+    [...history.speed].reverse().forEach(e => {
+      sBody.innerHTML += `<tr><td>${e.date}</td><td><strong>${e.type}</strong></td><td style="color:#38bdf8;">${e.down}</td><td>${e.up}</td><td>${e.ping} ms</td></tr>`;
+    });
+  }
 
   const pBody = document.getElementById('pingHistoryTableBody');
-  pBody.innerHTML = history.ping.length ? '' : '<tr><td colspan="4">No data available.</td></tr>';
-  [...history.ping].reverse().forEach(e => {
-    pBody.innerHTML += `<tr><td>${e.date}</td><td><strong>${e.target}</strong></td><td>${e.latency}</td><td>${e.loss}</td></tr>`;
-  });
+  if (pBody) {
+    pBody.innerHTML = history.ping.length ? '' : '<tr><td colspan="4">No data available.</td></tr>';
+    [...history.ping].reverse().forEach(e => {
+      pBody.innerHTML += `<tr><td>${e.date}</td><td><strong>${e.target}</strong></td><td>${e.latency}</td><td>${e.loss}</td></tr>`;
+    });
+  }
 }
 
 async function saveSpeedHistory(type, down, up, ping) {
@@ -306,7 +386,7 @@ async function savePingHistory(target, latency, loss) {
 }
 
 async function clearHistory() {
-  if(confirm("Permanently wipe all diagnostic records?")) {
+  if (confirm("Permanently wipe all diagnostic records?")) {
     await pywebview.api.clear_history();
     loadHistory();
     log("Diagnostic storage formatted successfully.");
