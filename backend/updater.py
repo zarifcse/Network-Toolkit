@@ -1,16 +1,22 @@
 import os
-import subprocess
 import sys
+import subprocess
 import requests
 
 GITHUB_REPO = "zarifcse/Network-Toolkit"
 CURRENT_VERSION = "v1.1.1"
 
+# Standard browser User-Agent to prevent GitHub web route 403 blocks
+HTTP_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+}
+
 def parse_version(v: str) -> tuple:
-    """Converts 'v1.1.1' into a numeric tuple (1, 1, 1) for accurate comparison."""
+    """Converts version strings like 'v1.1.1' into numeric tuples (1, 1, 1)."""
     try:
         clean = v.lstrip("v").strip()
-        return tuple(int(x) for x in clean.split(".") if x.isdigit())
+        parts = [int(x) for x in clean.split(".") if x.isdigit()]
+        return tuple(parts) if parts else (0, 0, 0)
     except Exception:
         return (0, 0, 0)
 
@@ -18,26 +24,23 @@ class UpdateManager:
     @staticmethod
     def check_for_updates() -> dict:
         """
-        Query standard GitHub web routes instead of the API.
-        This completely bypasses the 60 requests/hour API rate limit.
+        Queries GitHub's release endpoint via 302 web-redirect inspection.
+        Completely bypasses GitHub API 60 req/hour rate limits without tokens.
         """
-        # Notice we removed "api." and changed the path to the standard web releases page
         url = f"https://github.com/{GITHUB_REPO}/releases/latest"
         
         try:
-            # allow_redirects=False captures the 302 Redirect header without downloading the webpage
-            resp = requests.get(url, allow_redirects=False, timeout=5)
+            resp = requests.get(url, headers=HTTP_HEADERS, allow_redirects=False, timeout=6)
             
-            if resp.status_code == 302:
+            if resp.status_code in (301, 302):
                 redirect_url = resp.headers.get("Location", "")
+                latest_version = redirect_url.rstrip("/").split("/")[-1]
                 
-                # The redirect URL ends with the tag name (e.g., .../releases/tag/v1.1.1)
-                latest_version = redirect_url.split("/")[-1]
-                
-                # Strict version comparison
                 if latest_version and parse_version(latest_version) > parse_version(CURRENT_VERSION):
-                    # Hardcode the expected asset download URL structure
-                    download_url = f"https://github.com/{GITHUB_REPO}/releases/download/{latest_version}/NetworkToolkit.exe"
+                    download_url = (
+                        f"https://github.com/{GITHUB_REPO}/releases/download/"
+                        f"{latest_version}/NetworkToolkit.exe"
+                    )
                     
                     return {
                         "update_available": True,
@@ -51,38 +54,55 @@ class UpdateManager:
         return {"update_available": False, "current_version": CURRENT_VERSION}
 
     @staticmethod
-    def apply_update(download_url: str):
-        """Downloads the new binary and spins off a bulletproof background process to replace it."""
-        temp_exe = os.path.join(os.environ["TEMP"], "NetworkToolkit_new.exe")
-        
-        # 1. Download the new file to a temporary location
-        r = requests.get(download_url, stream=True)
-        with open(temp_exe, "wb") as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
+    def apply_update(download_url: str) -> dict:
+        """
+        Streams the new binary with strict timeouts, validates payload size,
+        and initiates a PID-targeted PowerShell hand-off before exiting.
+        """
+        temp_dir = os.environ.get("TEMP", os.getcwd())
+        temp_exe = os.path.join(temp_dir, "NetworkToolkit_update.exe")
+        current_exe = os.path.abspath(sys.executable)
+        current_pid = os.getpid()
 
-        current_exe = sys.executable
-        
-        # 2. Create a bulletproof updater script with a Retry Loop
-        bat_path = os.path.join(os.environ["TEMP"], "network_toolkit_updater.bat")
-        bat_content = f"""@echo off
-:WaitLoop
-timeout /t 1 /nobreak >nul
-del "{current_exe}" >nul 2>&1
-if exist "{current_exe}" goto WaitLoop
+        try:
+            # 1. Stream download with connection and chunk timeouts
+            with requests.get(download_url, headers=HTTP_HEADERS, stream=True, timeout=15) as r:
+                r.raise_for_status()
+                with open(temp_exe, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=65536):
+                        if chunk:
+                            f.write(chunk)
 
-move /y "{temp_exe}" "{current_exe}" >nul 2>&1
-start "" "{current_exe}"
-del "%~f0"
-"""
-        with open(bat_path, "w") as bat_file:
-            bat_file.write(bat_content)
-        
-        # 3. Launch the script completely detached from the main application
-        subprocess.Popen(
-            ["cmd.exe", "/c", bat_path],
-            creationflags=0x08000000 | 0x00000008
-        )
-        
-        # 4. Instantly kill this program to release the Windows file lock immediately
-        os._exit(0)
+            # 2. Payload integrity check (must exist and be > 3MB for a PyInstaller bundle)
+            if not os.path.exists(temp_exe) or os.path.getsize(temp_exe) < 3 * 1024 * 1024:
+                if os.path.exists(temp_exe):
+                    os.remove(temp_exe)
+                return {"status": "error", "message": "Incomplete or corrupted download."}
+
+            # 3. PID-Targeted PowerShell hand-off:
+            # - Waits explicitly for current process PID to clear memory and file locks
+            # - Forces binary overwrite
+            # - Relaunches the updated executable
+            ps_command = (
+                f"$ErrorActionPreference = 'Stop'; "
+                f"try {{ Wait-Process -Id {current_pid} -Timeout 10 }} catch {{ }}; "
+                f"Start-Sleep -Milliseconds 600; "
+                f"Move-Item -LiteralPath '{temp_exe}' -Destination '{current_exe}' -Force; "
+                f"Start-Process -FilePath '{current_exe}'"
+            )
+
+            subprocess.Popen(
+                ["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_command],
+                creationflags=subprocess.CREATE_NO_WINDOW | 0x00000008  # DETACHED_PROCESS
+            )
+
+            # 4. Terminate process immediately to release file lock
+            os._exit(0)
+
+        except Exception as e:
+            if os.path.exists(temp_exe):
+                try:
+                    os.remove(temp_exe)
+                except OSError:
+                    pass
+            return {"status": "error", "message": f"Update failed: {str(e)}"}
